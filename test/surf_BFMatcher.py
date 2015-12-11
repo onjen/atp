@@ -109,7 +109,7 @@ def draw_matches(window_name, kp_pairs, img1, img2):
         explore_match(window_name, img1, img2, kp_pairs, status, H)
 
 ###############################################################################
-# Test Main
+# Main
 ###############################################################################
 
 if __name__ == '__main__':
