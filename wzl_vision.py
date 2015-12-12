@@ -117,6 +117,8 @@ def draw_matches(window_name, kp_pairs, img1, img2):
 ###############################################################################
 
 if __name__ == '__main__':
+    # TODO when adding an order calculate keypoints and so on
+    # TODO kp_pairs threshold dynamically, dependant on the features?
     """Test code: Uses the two specified"""
     if len(sys.argv) < 2:
         print "No filenames specified"
@@ -131,10 +133,9 @@ if __name__ == '__main__':
     # os.walk returns a three tuple where 0 is the folder name
     for i in os.walk('images'):
 	    if os.path.isfile(i[0] + '/back.png'):
-		    print i[0]
 		    img2 = cv2.imread(i[0] + '/back.png', 0)
     		    kp_pairs = match_images(img1, img2)
-    		    if kp_pairs is not None and len(kp_pairs) >= 50:
+    		    if kp_pairs is not None and len(kp_pairs) >= 15:
         	        draw_matches('find_obj', kp_pairs, img1, img2)
     
     if img1 is None:
