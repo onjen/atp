@@ -1,24 +1,25 @@
 #!/usr/bin/env python
 
 '''
-Uses SURF to match two images.
-
-Based on the sample code from opencv:
-  samples/python2/find_obj.py
-
-USAGE
-  find_obj.py <image1> <image2>
+Documentation
 '''
 
 import numpy
 import cv2
 import os
 import sys
+import requests
+import urllib
+import json
 
-###############################################################################
+
+# Globals
+order_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?orderID='
+order_url_end = '&resourceType=json'
+pic_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?filename='
+pairs_threshold = 5
+
 # Image Matching
-###############################################################################
-
 def match_images(img1, img2):
     """Given two images, returns the matches"""
     detector = cv2.xfeatures2d.SURF_create(400, 5, 5)
@@ -26,13 +27,13 @@ def match_images(img1, img2):
 
     kp1, desc1 = detector.detectAndCompute(img1, None)
     kp2, desc2 = detector.detectAndCompute(img2, None)
-    print 'img1 - %d features, img2 - %d features' % (len(kp1), len(kp2))
+    print 'sample - %d features, cam_pic - %d features' % (len(kp1), len(kp2))
 
     if desc2 is not None:
-    	    raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
+            raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
     else:
-	    print('************ Warning, no descriptors extracted! **************')
-	    return None
+        print('************ Warning, no descriptors extracted! **************')
+        return None
     kp_pairs = filter_matches(kp1, kp2, raw_matches)
     return kp_pairs
 
@@ -47,10 +48,7 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
     return kp_pairs
     
     
-###############################################################################
 # Match Diplaying
-###############################################################################
-
 def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
@@ -103,45 +101,88 @@ def draw_matches(window_name, kp_pairs, img1, img2):
     
     if len(kp_pairs) >= 4:
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
-	if status is not None:
-        	print '%d / %d  inliers/matched' % (numpy.sum(status), len(status))
+    if status is not None:
+        inliers = numpy.sum(status)
+        matched = len(status)
+        print( '%d / %d    inliers/matched quotient=%d' % (inliers, matched, matched/inliers))
+        if (matched/inliers < 25):
+           explore_match(window_name, img1, img2, kp_pairs, status, H)
     else:
         H, status = None, None
         #print '%d matches found, not enough for homography estimation' % len(p1)
     
-    if len(p1):
-        explore_match(window_name, img1, img2, kp_pairs, status, H)
 
-###############################################################################
 # Main
-###############################################################################
-
 if __name__ == '__main__':
     # TODO when adding an order calculate keypoints and so on
     # TODO kp_pairs threshold dynamically, dependant on the features?
-    """Test code: Uses the two specified"""
-    if len(sys.argv) < 2:
-        print "No filenames specified"
-        print "USAGE: find_obj.py <image1> <image2>"
-        sys.exit(1)
-    
-    fn1 = sys.argv[1]
 
-    img1 = cv2.imread(fn1, 0)
-    # img2 = cv2.imread(fn2, 0)
+    cam_pic = cv2.imread('lego6.png', 0)
 
     # os.walk returns a three tuple where 0 is the folder name
+    #sample = cv2.imread('images/20141/back.png', 0)
+    #kp_pairs = match_images(sample, cam_pic)
+    #print("Length of kp_pairs = %d" % len(kp_pairs))
+    #draw_matches('find_obj', kp_pairs, sample , cam_pic)
     for i in os.walk('images'):
-	    if os.path.isfile(i[0] + '/back.png'):
-		    img2 = cv2.imread(i[0] + '/back.png', 0)
-    		    kp_pairs = match_images(img1, img2)
-    		    if kp_pairs is not None and len(kp_pairs) >= 15:
-        	        draw_matches('find_obj', kp_pairs, img1, img2)
-    
-    if img1 is None:
-        print 'Failed to load fn1:', fn1
-        sys.exit(1)
-    else:
-        print "No matches found"
-    
-    
+         if os.path.isfile(i[0] + '/back.png'):
+             sample = cv2.imread(i[0] + '/back.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             print 'back'
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/front.png'):
+             sample = cv2.imread(i[0] + '/front.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             print 'back'
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/left.png'):
+             sample = cv2.imread(i[0] + '/left.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             print 'back'
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/right.png'):
+             sample = cv2.imread(i[0] + '/right.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             print 'back'
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+
+
+# get all brick pictures from active orders in the database
+def get_picture_db():
+    r = requests.get('http://134.130.232.9:50000/AppParkServer/OrderServlet?progress=99')
+    json_request = r.json()
+    orders = []
+    bricks = []
+    # get all bricks
+    for i in json_request:
+        # an order looks like this:
+        # {"brickID":21914,"color":15,"hasStuds":1,"offsetX":3,"offsetY":0,"offsetZ":3,"sizeX":4,"sizeZ":2,
+        # "images":[{"front":"brickID21914front.png"},{"back":"template303back.png"},
+        # {"left":"template303left.png"},{"right":"template303right.png"}]}
+        order = requests.get(order_url_start + str(i['orderID']) + order_url_end).json()
+        for brick in order:
+            bricks.append(brick)
+        orders.append(order)
+
+    if not os.path.isdir('../images'):
+        os.makedirs('../images')
+
+    for brick in bricks:
+        brick_folder = '../images/' + str(brick['brickID'])
+        if not os.path.isdir(brick_folder):
+            os.makedirs(brick_folder)
+        # TODO remove old folders
+        images = brick['images']
+        for image in images:
+            if 'front' in image:
+                urllib.urlretrieve(pic_url_start + image['front'], brick_folder + '/front.png')
+            if 'back' in image:
+                urllib.urlretrieve(pic_url_start + image['back'], brick_folder + '/back.png')
+                if 'left' in image:
+                    urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
+                if 'right' in image:
+                    urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
