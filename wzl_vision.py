@@ -11,6 +11,7 @@ import sys
 import requests
 import urllib
 import json
+import math
 
 
 # Globals
@@ -61,6 +62,10 @@ def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
         corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
         corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
         print corners
+        is_rect = is_rectangular(corners)
+        #TODO change the method calls
+        if not is_rect:
+            return None
         cv2.polylines(vis, [corners], True, (51, 255, 255))
 
     if status is None:
@@ -112,41 +117,25 @@ def draw_matches(window_name, kp_pairs, img1, img2):
         H, status = None, None
         #print '%d matches found, not enough for homography estimation' % len(p1)
     
-
-# Main
-if __name__ == '__main__':
-    # TODO when adding an order calculate keypoints and so on
-    # TODO kp_pairs threshold dynamically, dependant on the features?
-
-    cam_pic = cv2.imread('lego6.png', 0)
-
-    # os.walk returns a three tuple where 0 is the folder name
-    #sample = cv2.imread('images/20141/back.png', 0)
-    #kp_pairs = match_images(sample, cam_pic)
-    #print("Length of kp_pairs = %d" % len(kp_pairs))
-    #draw_matches('find_obj', kp_pairs, sample , cam_pic)
-    for i in os.walk('images'):
-         if os.path.isfile(i[0] + '/back.png'):
-             sample = cv2.imread(i[0] + '/back.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/front.png'):
-             sample = cv2.imread(i[0] + '/front.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/left.png'):
-             sample = cv2.imread(i[0] + '/left.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/right.png'):
-             sample = cv2.imread(i[0] + '/right.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
-
+def is_rectangular(corners):
+    A_x = corners[0][0]
+    A_y = corners[0][1]
+    B_x = corners[1][0]
+    B_y = corners[1][1]
+    C_x = corners[2][0]
+    C_y = corners[2][1]
+    D_x = corners[3][0]
+    D_y = corners[3][1]
+    dist_AD = math.sqrt(math.pow(A_x - D_x, 2) + math.pow(A_y - D_y, 2))
+    print ('distance AD: %d' % dist_AD)
+    dist_BC = math.sqrt(math.pow(B_x - C_x, 2) + math.pow(B_y - C_y, 2))
+    print ('distance BC: %d' % dist_BC)
+    # check if the diagonals are almost equal and if the distances are valid
+    # TODO dependent on the resolution
+    if abs(dist_AD - dist_BC) < 20 and dist_AD > 80 and dist_BC > 80:
+        return True
+    else:
+        return False
 
 # get all brick pictures from active orders in the database
 def get_picture_db():
@@ -183,3 +172,39 @@ def get_picture_db():
                     urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
                 if 'right' in image:
                     urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
+
+# Main
+if __name__ == '__main__':
+    # TODO when adding an order calculate keypoints and so on
+    # TODO kp_pairs threshold dynamically, dependant on the features?
+    # TODO lego2 and lego3 aren't recognised
+
+    cam_pic = cv2.imread('lego6.png', 0)
+
+    # os.walk returns a three tuple where 0 is the folder name
+    #sample = cv2.imread('images/20141/back.png', 0)
+    #kp_pairs = match_images(sample, cam_pic)
+    #print("Length of kp_pairs = %d" % len(kp_pairs))
+    #draw_matches('find_obj', kp_pairs, sample , cam_pic)
+    for i in os.walk('images'):
+         if os.path.isfile(i[0] + '/back.png'):
+             sample = cv2.imread(i[0] + '/back.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/front.png'):
+             sample = cv2.imread(i[0] + '/front.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/left.png'):
+             sample = cv2.imread(i[0] + '/left.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+         if os.path.isfile(i[0] + '/right.png'):
+             sample = cv2.imread(i[0] + '/right.png', 0)
+             kp_pairs = match_images(sample, cam_pic)
+             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+
