@@ -60,7 +60,8 @@ def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     if H is not None:
         corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
         corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
-        cv2.polylines(vis, [corners], True, (255, 255, 255))
+        print corners
+        cv2.polylines(vis, [corners], True, (51, 255, 255))
 
     if status is None:
         status = numpy.ones(len(kp_pairs), numpy.bool_)
@@ -128,25 +129,21 @@ if __name__ == '__main__':
          if os.path.isfile(i[0] + '/back.png'):
              sample = cv2.imread(i[0] + '/back.png', 0)
              kp_pairs = match_images(sample, cam_pic)
-             print 'back'
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
                  draw_matches('find_obj', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/front.png'):
              sample = cv2.imread(i[0] + '/front.png', 0)
              kp_pairs = match_images(sample, cam_pic)
-             print 'back'
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
                  draw_matches('find_obj', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/left.png'):
              sample = cv2.imread(i[0] + '/left.png', 0)
              kp_pairs = match_images(sample, cam_pic)
-             print 'back'
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
                  draw_matches('find_obj', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/right.png'):
              sample = cv2.imread(i[0] + '/right.png', 0)
              kp_pairs = match_images(sample, cam_pic)
-             print 'back'
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
                  draw_matches('find_obj', kp_pairs, sample , cam_pic)
 
