@@ -117,25 +117,37 @@ def draw_matches(window_name, kp_pairs, img1, img2):
         H, status = None, None
         #print '%d matches found, not enough for homography estimation' % len(p1)
     
+# check if the four points span a rectangle
 def is_rectangular(corners):
-    A_x = corners[0][0]
-    A_y = corners[0][1]
-    B_x = corners[1][0]
-    B_y = corners[1][1]
-    C_x = corners[2][0]
-    C_y = corners[2][1]
-    D_x = corners[3][0]
-    D_y = corners[3][1]
-    dist_AD = math.sqrt(math.pow(A_x - D_x, 2) + math.pow(A_y - D_y, 2))
+    A = corners[0]
+    B = corners[1]
+    C = corners[2]
+    D = corners[3]
+    dist_AD = math.sqrt(math.pow(A[0] - D[0], 2) + math.pow(A[1] - D[1], 2))
     print ('distance AD: %d' % dist_AD)
-    dist_BC = math.sqrt(math.pow(B_x - C_x, 2) + math.pow(B_y - C_y, 2))
+    dist_BC = math.sqrt(math.pow(B[0] - C[0], 2) + math.pow(B[1] - C[1], 2))
     print ('distance BC: %d' % dist_BC)
     # check if the diagonals are almost equal and if the distances are valid
     # TODO dependent on the resolution
     if abs(dist_AD - dist_BC) < 20 and dist_AD > 80 and dist_BC > 80:
-        return True
+        angle_A = py_ang(A-B, A-D)
+        angle_B = py_ang(B-A, B-C)
+        angle_C = py_ang(C-B, C-D)
+        angle_D = py_ang(D-C, D-A)
+        print ('angles A: %f, B: %f, C: %f, D: %f' % (angle_A, angle_B, angle_C,
+            angle_D))
+        angle_sum = angle_A + angle_B + angle_C + angle_D
+        print('angle_sum = %f' % angle_sum)
+        if (angle_sum > 340 and angle_sum < 380):
+            return True
     else:
         return False
+
+#Returns the angle in radians between vectors 'v1' and 'v2'
+def py_ang(v1, v2):
+    cosang = numpy.dot(v1, v2)
+    sinang = numpy.linalg.norm(numpy.cross(v1, v2))
+    return math.degrees(numpy.arctan2(sinang, cosang))
 
 # get all brick pictures from active orders in the database
 def get_picture_db():
