@@ -1,0 +1,6 @@
+opencv
+opencv features2d
+python
+python-opencv
+python-requests
+git
