@@ -12,7 +12,7 @@ import requests
 import urllib
 import json
 import math
-
+import cPickle as pickle
 
 # Globals
 order_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?orderID='
@@ -159,6 +159,28 @@ def length(v):
 def angle(v1, v2):
   return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
 
+# use pickle to serialize keypoints and descriptors
+def pickle_keypoints(keypoints, descriptors):
+    i = 0
+    temp_array = []
+    for point in keypoints:
+        temp = (point.pt, point.size, point.angle, point.response, point.octave,
+        point.class_id, descriptors[i])
+        ++i
+        temp_array.append(temp)
+    return temp_array
+
+# use pickle to de-serialize keypoints and descriptors
+def unpickle_keypoints(array):
+    keypoints = []
+    descriptors = []
+    for point in array:
+        temp_feature = cv2.KeyPoint(x=point[0][0],y=point[0][1],_size=point[1], _angle=point[2], _response=point[3], _octave=point[4], _class_id=point[5])
+        temp_descriptor = point[6]
+        keypoints.append(temp_feature)
+        descriptors.append(temp_descriptor)
+    return keypoints, np.array(descriptors)
+
 # get all brick pictures from active orders in the database
 def get_picture_db():
     r = requests.get('http://134.130.232.9:50000/AppParkServer/OrderServlet?progress=99')
@@ -201,32 +223,19 @@ if __name__ == '__main__':
     # TODO kp_pairs threshold dynamically, dependant on the features?
     # TODO lego2 and lego3 aren't recognised
 
-    cam_pic = cv2.imread('lego6.png', 0)
+    cam_pic = cv2.imread('lego5.png', 0)
 
     # os.walk returns a three tuple where 0 is the folder name
     #sample = cv2.imread('images/20141/back.png', 0)
     #kp_pairs = match_images(sample, cam_pic)
     #print("Length of kp_pairs = %d" % len(kp_pairs))
     #draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
+    images = ['/back.png', '/front.png', '/left.png', '/right.png']
     for i in os.walk('images'):
-         if os.path.isfile(i[0] + '/back.png'):
-             sample = cv2.imread(i[0] + '/back.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/front.png'):
-             sample = cv2.imread(i[0] + '/front.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/left.png'):
-             sample = cv2.imread(i[0] + '/left.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
-         if os.path.isfile(i[0] + '/right.png'):
-             sample = cv2.imread(i[0] + '/right.png', 0)
-             kp_pairs = match_images(sample, cam_pic)
-             if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
-
+        for image in images:
+            filepath = i[0] + image
+            if os.path.isfile(filepath):
+                sample = cv2.imread(filepath, 0)
+                kp_pairs = match_images(sample, cam_pic)
+                if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                     draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
