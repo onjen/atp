@@ -23,12 +23,18 @@ pairs_threshold = 5
 # Image Matching
 def match_images(img1, img2):
     """Given two images, returns the matches"""
-    detector = cv2.xfeatures2d.SURF_create(400, 5, 5)
+    # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
+    # extended, bool upright
+    detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
     matcher = cv2.BFMatcher(cv2.NORM_L2)
 
     kp1, desc1 = detector.detectAndCompute(img1, None)
     kp2, desc2 = detector.detectAndCompute(img2, None)
     print 'sample - %d features, cam_pic - %d features' % (len(kp1), len(kp2))
+    # draw keypoints for debug purpose
+    #imm=cv2.drawKeypoints(img1, kp1,img2);
+    #cv2.imshow("Image", imm);
+    #cv2.waitKey(0)
 
     if desc2 is not None:
             raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
@@ -61,7 +67,6 @@ def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     if H is not None:
         corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
         corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
-        print corners
         is_rect = is_rectangular(corners)
         #TODO change the method calls
         if not is_rect:
@@ -111,6 +116,7 @@ def draw_matches(window_name, kp_pairs, img1, img2):
         inliers = numpy.sum(status)
         matched = len(status)
         print( '%d / %d    inliers/matched quotient=%d' % (inliers, matched, matched/inliers))
+        #TODO tune here
         if (matched/inliers < 25):
            explore_match(window_name, img1, img2, kp_pairs, status, H)
     else:
@@ -129,11 +135,11 @@ def is_rectangular(corners):
     print ('distance BC: %d' % dist_BC)
     # check if the diagonals are almost equal and if the distances are valid
     # TODO dependent on the resolution
-    if abs(dist_AD - dist_BC) < 20 and dist_AD > 80 and dist_BC > 80:
-        angle_A = py_ang(A-B, A-D)
-        angle_B = py_ang(B-A, B-C)
-        angle_C = py_ang(C-B, C-D)
-        angle_D = py_ang(D-C, D-A)
+    if abs(dist_AD - dist_BC) < 50 and dist_AD > 80 and dist_BC > 80:
+        angle_A = angle(A-B, A-D)
+        angle_B = angle(B-A, B-C)
+        angle_C = angle(C-B, C-D)
+        angle_D = angle(D-C, D-A)
         print ('angles A: %f, B: %f, C: %f, D: %f' % (angle_A, angle_B, angle_C,
             angle_D))
         angle_sum = angle_A + angle_B + angle_C + angle_D
@@ -143,11 +149,15 @@ def is_rectangular(corners):
     else:
         return False
 
+def dotproduct(v1, v2):
+  return sum((a*b) for a, b in zip(v1, v2))
+
+def length(v):
+  return math.sqrt(dotproduct(v, v))
+
 #Returns the angle in radians between vectors 'v1' and 'v2'
-def py_ang(v1, v2):
-    cosang = numpy.dot(v1, v2)
-    sinang = numpy.linalg.norm(numpy.cross(v1, v2))
-    return math.degrees(numpy.arctan2(sinang, cosang))
+def angle(v1, v2):
+  return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
 
 # get all brick pictures from active orders in the database
 def get_picture_db():
@@ -197,26 +207,26 @@ if __name__ == '__main__':
     #sample = cv2.imread('images/20141/back.png', 0)
     #kp_pairs = match_images(sample, cam_pic)
     #print("Length of kp_pairs = %d" % len(kp_pairs))
-    #draw_matches('find_obj', kp_pairs, sample , cam_pic)
+    #draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
     for i in os.walk('images'):
          if os.path.isfile(i[0] + '/back.png'):
              sample = cv2.imread(i[0] + '/back.png', 0)
              kp_pairs = match_images(sample, cam_pic)
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/front.png'):
              sample = cv2.imread(i[0] + '/front.png', 0)
              kp_pairs = match_images(sample, cam_pic)
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/left.png'):
              sample = cv2.imread(i[0] + '/left.png', 0)
              kp_pairs = match_images(sample, cam_pic)
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
          if os.path.isfile(i[0] + '/right.png'):
              sample = cv2.imread(i[0] + '/right.png', 0)
              kp_pairs = match_images(sample, cam_pic)
              if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                 draw_matches('find_obj', kp_pairs, sample , cam_pic)
+                 draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
 
