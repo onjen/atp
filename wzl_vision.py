@@ -2,6 +2,7 @@
 
 '''
 Documentation
+TODO
 '''
 
 import numpy
@@ -20,30 +21,31 @@ order_url_end = '&resourceType=json'
 pic_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?filename='
 pairs_threshold = 5
 
-# Image Matching
-def match_images(img1, img2):
-    """Given two images, returns the matches"""
+# extract the keypoints and the descriptors out of a sample image
+def extract_keypoints(img):
     # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
     # extended, bool upright
     detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
-    matcher = cv2.BFMatcher(cv2.NORM_L2)
-
-    kp1, desc1 = detector.detectAndCompute(img1, None)
-    kp2, desc2 = detector.detectAndCompute(img2, None)
-    print 'sample - %d features, cam_pic - %d features' % (len(kp1), len(kp2))
+    kp, desc = detector.detectAndCompute(img, None)
     # draw keypoints for debug purpose
+    #print '%d keypoints extracted' % len(kp)
     #imm=cv2.drawKeypoints(img1, kp1,img2);
     #cv2.imshow("Image", imm);
     #cv2.waitKey(0)
+    return kp, desc
 
+# Image Matching
+def match_images(kp1, desc1, kp2, desc2):
+    matcher = cv2.BFMatcher(cv2.NORM_L2)
     if desc2 is not None:
-            raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
+        raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
     else:
         print('************ Warning, no descriptors extracted! **************')
         return None
     kp_pairs = filter_matches(kp1, kp2, raw_matches)
     return kp_pairs
 
+# filter the matches by euclidean distance
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
     mkp1, mkp2 = [], []
     for m in matches:
@@ -53,7 +55,6 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
             mkp2.append( kp2[m.trainIdx] )
     kp_pairs = zip(mkp1, mkp2)
     return kp_pairs
-    
     
 # Match Diplaying
 def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
@@ -110,7 +111,7 @@ def draw_matches(window_name, kp_pairs, img1, img2):
     p1 = numpy.float32([kp.pt for kp in mkp1])
     p2 = numpy.float32([kp.pt for kp in mkp2])
     
-    if len(kp_pairs) >= 4:
+    if len(kp_pairs) >= pairs_threshold:
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
     if status is not None:
         inliers = numpy.sum(status)
@@ -130,9 +131,9 @@ def is_rectangular(corners):
     C = corners[2]
     D = corners[3]
     dist_AD = math.sqrt(math.pow(A[0] - D[0], 2) + math.pow(A[1] - D[1], 2))
-    print ('distance AD: %d' % dist_AD)
+    #print ('distance AD: %d' % dist_AD)
     dist_BC = math.sqrt(math.pow(B[0] - C[0], 2) + math.pow(B[1] - C[1], 2))
-    print ('distance BC: %d' % dist_BC)
+    #print ('distance BC: %d' % dist_BC)
     # check if the diagonals are almost equal and if the distances are valid
     # TODO dependent on the resolution
     if abs(dist_AD - dist_BC) < 50 and dist_AD > 80 and dist_BC > 80:
@@ -140,10 +141,10 @@ def is_rectangular(corners):
         angle_B = angle(B-A, B-C)
         angle_C = angle(C-B, C-D)
         angle_D = angle(D-C, D-A)
-        print ('angles A: %f, B: %f, C: %f, D: %f' % (angle_A, angle_B, angle_C,
-            angle_D))
+        #print ('angles A: %f, B: %f, C: %f, D: %f' % (angle_A, angle_B, angle_C,
+        #    angle_D))
         angle_sum = angle_A + angle_B + angle_C + angle_D
-        print('angle_sum = %f' % angle_sum)
+        #print('angle_sum = %f' % angle_sum)
         if (angle_sum > 340 and angle_sum < 380):
             return True
     else:
@@ -222,20 +223,21 @@ if __name__ == '__main__':
     # TODO when adding an order calculate keypoints and so on
     # TODO kp_pairs threshold dynamically, dependant on the features?
     # TODO lego2 and lego3 aren't recognised
+    # TODO check if every angle is rougly around 90 degree
 
-    cam_pic = cv2.imread('lego5.png', 0)
+    cam_pic = cv2.imread('lego2.bmp', 0)
 
-    # os.walk returns a three tuple where 0 is the folder name
-    #sample = cv2.imread('images/20141/back.png', 0)
-    #kp_pairs = match_images(sample, cam_pic)
-    #print("Length of kp_pairs = %d" % len(kp_pairs))
-    #draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
+    # no need to extra the kp of the camera picture every time so do it here
+    kp2, desc2 = extract_keypoints(cam_pic)
     images = ['/back.png', '/front.png', '/left.png', '/right.png']
+    # os.walk returns a three tuple where 0 is the folder name
     for i in os.walk('images'):
         for image in images:
             filepath = i[0] + image
             if os.path.isfile(filepath):
                 sample = cv2.imread(filepath, 0)
-                kp_pairs = match_images(sample, cam_pic)
+                kp1, desc1 = extract_keypoints(sample)
+                kp_pairs = match_images(kp1, desc1, kp2, desc2)
+                # time when extracting all keypoints of the samples 14s real
                 if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
                      draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
