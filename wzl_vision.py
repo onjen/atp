@@ -2,6 +2,8 @@
 
 '''
 Documentation
+different filters (matches, quotient, geometrical and so on)
+performance (serialize and store the keypoints, save to database)
 TODO
 '''
 
@@ -14,6 +16,7 @@ import urllib
 import json
 import math
 import cPickle as pickle
+from image import *
 
 # Globals
 order_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?orderID='
@@ -37,12 +40,15 @@ def extract_keypoints(img):
 # Image Matching
 def match_images(kp1, desc1, kp2, desc2):
     matcher = cv2.BFMatcher(cv2.NORM_L2)
+    print type(desc1)
     if desc2 is not None:
-        raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2) #2
+        raw_matches = matcher.match(desc1, desc2)
     else:
         print('************ Warning, no descriptors extracted! **************')
         return None
-    kp_pairs = filter_matches(kp1, kp2, raw_matches)
+    #TODO remove this filter!!
+    #kp_pairs = filter_matches(kp1, kp2, raw_matches)
+    kp_pairs = zip(kp1, kp2)
     return kp_pairs
 
 # filter the matches by euclidean distance
@@ -110,7 +116,7 @@ def draw_matches(window_name, kp_pairs, img1, img2):
     
     p1 = numpy.float32([kp.pt for kp in mkp1])
     p2 = numpy.float32([kp.pt for kp in mkp2])
-    
+   
     if len(kp_pairs) >= pairs_threshold:
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
     if status is not None:
@@ -160,28 +166,6 @@ def length(v):
 def angle(v1, v2):
   return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
 
-# use pickle to serialize keypoints and descriptors
-def pickle_keypoints(keypoints, descriptors):
-    i = 0
-    temp_array = []
-    for point in keypoints:
-        temp = (point.pt, point.size, point.angle, point.response, point.octave,
-        point.class_id, descriptors[i])
-        ++i
-        temp_array.append(temp)
-    return temp_array
-
-# use pickle to de-serialize keypoints and descriptors
-def unpickle_keypoints(array):
-    keypoints = []
-    descriptors = []
-    for point in array:
-        temp_feature = cv2.KeyPoint(x=point[0][0],y=point[0][1],_size=point[1], _angle=point[2], _response=point[3], _octave=point[4], _class_id=point[5])
-        temp_descriptor = point[6]
-        keypoints.append(temp_feature)
-        descriptors.append(temp_descriptor)
-    return keypoints, np.array(descriptors)
-
 # get all brick pictures from active orders in the database
 def get_picture_db():
     r = requests.get('http://134.130.232.9:50000/AppParkServer/OrderServlet?progress=99')
@@ -218,26 +202,57 @@ def get_picture_db():
                 if 'right' in image:
                     urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
 
+def save_keypoints():
+    # TODO update with new order
+    image_list = []
+    filenames = ['/back.png', '/front.png', '/left.png', '/right.png']
+    # os.walk returns a three tuple where 0 is the folder name
+    for i in os.walk('images'):
+        #TODO right now brick_id is wrong (images/21524)
+        print image_list[0].brick_id
+        brick_id = i[0]
+        for filename in filenames:
+            filepath = brick_id + filename
+            if os.path.isfile(filepath):
+                sample = cv2.imread(filepath, 0)
+                kp1, desc1 = extract_keypoints(sample)
+                print '%d keypoints extracted' % len(kp1)
+                # Store the keypoints
+                temp_image = Image(kp1, desc1, filename, brick_id)
+                image_list.append(temp_image)
+    print len(image_list)
+    pickle.dump(image_list, open('image_prop_database.pickle', 'wb'))
+
+# reformat to de-serialize keypoints and descriptors
+def unpickle_keypoints(image):
+    keypoints = []
+    descriptors = []
+    #for point in keypoints_array:
+    for point in image.keypoints_array:
+        temp_feature = cv2.KeyPoint(x=point[0][0],y=point[0][1],_size=point[1], _angle=point[2], _response=point[3], _octave=point[4], _class_id=point[5])
+        keypoints.append(temp_feature)
+        temp_descriptor = point[6]
+        descriptors.append(temp_descriptor)
+    return keypoints, numpy.array(descriptors)
+
 # Main
 if __name__ == '__main__':
     # TODO when adding an order calculate keypoints and so on
     # TODO kp_pairs threshold dynamically, dependant on the features?
     # TODO lego2 and lego3 aren't recognised
     # TODO check if every angle is rougly around 90 degree
+    # TODO remember to free memory
 
     cam_pic = cv2.imread('lego2.bmp', 0)
+    image_list = []
+    # TODO make sure it wrote before trying to load
+    image_list = pickle.load(open('image_prop_database.pickle', 'rb'))
 
-    # no need to extra the kp of the camera picture every time so do it here
     kp2, desc2 = extract_keypoints(cam_pic)
-    images = ['/back.png', '/front.png', '/left.png', '/right.png']
-    # os.walk returns a three tuple where 0 is the folder name
-    for i in os.walk('images'):
-        for image in images:
-            filepath = i[0] + image
-            if os.path.isfile(filepath):
-                sample = cv2.imread(filepath, 0)
-                kp1, desc1 = extract_keypoints(sample)
-                kp_pairs = match_images(kp1, desc1, kp2, desc2)
-                # time when extracting all keypoints of the samples 14s real
-                if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                     draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
+
+    for image_obj in image_list:
+        kp1, desc1 = unpickle_keypoints(image_obj)
+        kp_pairs = match_images(kp1, desc1, kp2, desc2)
+        # time when extracting all keypoints of the samples 14s real
+        if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+            draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
