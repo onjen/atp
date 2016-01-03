@@ -63,7 +63,7 @@ def filter_matches(kp1, kp2, matches, ratio = 0.75):
     return kp_pairs
     
 # Match Diplaying
-def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
+def explore_match(img1, img2, kp_pairs, status = None, H = None):
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     vis = numpy.zeros((max(h1, h2), w1+w2), numpy.uint8)
@@ -106,11 +106,9 @@ def explore_match(win, img1, img2, kp_pairs, status = None, H = None):
     for (x1, y1), (x2, y2), inlier in zip(p1, p2, status):
         if inlier:
             cv2.line(vis, (x1, y1), (x2, y2), green)
-
-    cv2.imshow(win, vis)
-    cv2.waitKey()
+    return vis
   
-def draw_matches(window_name, kp_pairs, img1, img2):
+def match_inliers(kp_pairs):
     """Draws the matches for """
     mkp1, mkp2 = zip(*kp_pairs)
     
@@ -125,7 +123,7 @@ def draw_matches(window_name, kp_pairs, img1, img2):
         print( '%d / %d    inliers/matched quotient=%d' % (inliers, matched, matched/inliers))
         #TODO tune here
         if (matched/inliers < 25):
-           explore_match(window_name, img1, img2, kp_pairs, status, H)
+            return status, H
     else:
         H, status = None, None
         #print '%d matches found, not enough for homography estimation' % len(p1)
@@ -255,4 +253,10 @@ if __name__ == '__main__':
         kp_pairs = match_images(kp1, desc1, kp2, desc2)
         # time when extracting all keypoints of the samples 14s real
         if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-            draw_matches('wzl_vision', kp_pairs, sample , cam_pic)
+            status, H = match_inliers(kp_pairs)
+            if status is not None:
+                sample = cv2.imread(image_obj.brick_id + image_obj.filename, 0)
+                vis = explore_match(sample, cam_pic, kp_pairs, status, H)
+                if vis is not None:
+                    cv2.imshow('wzl_vision', vis)
+                    cv2.waitKey()
