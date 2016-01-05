@@ -232,6 +232,11 @@ if __name__ == '__main__':
     # time when extracting all keypoints of the samples 14s real
 
     #save_keypoints()
+
+    # saves a camera picture as single.bmp
+    #cmd = 'bin/SingleCaptureStorage'
+    #os.system(cmd)
+    #cam_pic = cv2.imread('bin/single.bmp',0)
     cam_pic = cv2.imread('lego2.bmp', 0)
     image_list = []
     # TODO make sure it wrote before trying to load
