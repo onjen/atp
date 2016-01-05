@@ -155,8 +155,10 @@ def length(v):
 def angle(v1, v2):
   return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
 
-# get all brick pictures from active orders in the database
-def get_picture_db():
+# get a list of bricks from active orders in the database
+# @return a list of JSON objects containing brick data
+def get_brick_db():
+    print 'Retrieving bricks from the server...'
     r = requests.get('http://134.130.232.9:50000/AppParkServer/OrderServlet?progress=99')
     json_request = r.json()
     orders = []
@@ -171,7 +173,8 @@ def get_picture_db():
         for brick in order:
             bricks.append(brick)
         orders.append(order)
-
+    return bricks
+'''
     if not os.path.isdir('../images'):
         os.makedirs('../images')
 
@@ -186,30 +189,33 @@ def get_picture_db():
                 urllib.urlretrieve(pic_url_start + image['front'], brick_folder + '/front.png')
             if 'back' in image:
                 urllib.urlretrieve(pic_url_start + image['back'], brick_folder + '/back.png')
-                if 'left' in image:
-                    urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
-                if 'right' in image:
-                    urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
-
+            if 'left' in image:
+                urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
+            if 'right' in image:
+                urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
+'''
 def save_keypoints():
     # TODO update with new order
+    print 'Extracting keypoints out of the sample images...'
     image_list = []
     filenames = ['/back.png', '/front.png', '/left.png', '/right.png']
-    # os.walk returns a three tuple where 0 is the folder name
-    for i in os.walk('images'):
-        #TODO right now brick_id is wrong (images/21524)
-        brick_id = i[0]
-        for filename in filenames:
-            filepath = brick_id + filename
-            if os.path.isfile(filepath):
-                sample = cv2.imread(filepath, 0)
-                kp, desc = extract_keypoints(sample)
-                print '%d keypoints extracted' % len(kp)
-                # Store the keypoints
-                temp_image = Image(kp, desc, filename, brick_id)
-                image_list.append(temp_image)
-    print len(image_list)
-    pickle.dump(image_list, open('image_prop_database.pickle', 'wb'))
+    # os.walk returns a three tuple where index 1 is a list of containing folder
+    # names
+    for dirs in os.walk('images'):
+        #sort them, else they would be arbitrary ordered
+        for brick_id in sorted(dirs[1], key=int):
+            for filename in filenames:
+                filepath = 'images/' + brick_id + filename
+                if os.path.isfile(filepath):
+                    sample = cv2.imread(filepath, 0)
+                    kp, desc = extract_keypoints(sample)
+                    # Store the keypoints
+                    temp_image = Image(kp, desc, filename, brick_id)
+                    image_list.append(temp_image)
+    print 'Keypoints for %d images extraced' % len(image_list)
+    db_name = 'image_prop_database.pickle'
+    print 'Dump keypoints database to \'%s\'...' % db_name
+    pickle.dump(image_list, open(db_name, 'wb'))
 
 # reformat to de-serialize keypoints and descriptors
 def unpickle_keypoints(image):
@@ -222,6 +228,24 @@ def unpickle_keypoints(image):
         descriptors.append(temp_descriptor)
     return keypoints, numpy.array(descriptors)
 
+# compare the brick id's from the server and in meomory
+# bricks_from_database is a JSON object containing brick data
+# image_list is the list of image_objects which is stored
+def compare_brick_ids(bricks_from_database, image_list):
+    bricks_from_database_formatted = []
+    bricks_saved = []
+    for brick in bricks_from_database:
+        bricks_from_database_formatted.append(brick['brickID'])
+        print brick['brickID']
+
+    for brick in image_list:
+        bricks_saved.append(brick.brick_id)
+        print brick.brick_id
+
+    for i in range(0, len(bricks_saved)):
+        print( 'database: %d, saved: %d' %
+            (bricks_from_database[i],bricks_saved[i]))
+
 # Main
 if __name__ == '__main__':
     # TODO when adding an order calculate keypoints and so on
@@ -231,7 +255,7 @@ if __name__ == '__main__':
     # TODO remember to free memory
     # time when extracting all keypoints of the samples 14s real
 
-    #save_keypoints()
+    save_keypoints()
 
     # saves a camera picture as single.bmp
     #cmd = 'bin/SingleCaptureStorage'
@@ -240,7 +264,11 @@ if __name__ == '__main__':
     cam_pic = cv2.imread('lego2.bmp', 0)
     image_list = []
     # TODO make sure it wrote before trying to load
+    print 'Loading saved pickle database...'
     image_list = pickle.load(open('image_prop_database.pickle', 'rb'))
+    # get a list of JSON objects containing brick data
+    bricks = get_brick_db()
+    compare_brick_ids(bricks, image_list)
 
     kp2, desc2 = extract_keypoints(cam_pic)
 
