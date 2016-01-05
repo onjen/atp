@@ -228,19 +228,25 @@ def unpickle_keypoints(image):
         descriptors.append(temp_descriptor)
     return keypoints, numpy.array(descriptors)
 
+# the pickled database contains all images, so we have multiple brick_id's
+# because on brick has several images (e.g. front.png, back.png...)
+def remove_duplicate_bricks(image_list):
+    checked = []
+    for brick in image_list:
+        brick_id = brick.brick_id
+        if brick_id not in checked:
+            checked.append(brick_id)
+    return checked
+
 # compare the brick id's from the server and in meomory
 # bricks_from_database is a JSON object containing brick data
 # image_list is the list of image_objects which is stored
 def compare_brick_ids(bricks_from_database, image_list):
     bricks_from_database_formatted = []
-    bricks_saved = []
+    bricks_saved = remove_duplicate_bricks(image_list)
     for brick in bricks_from_database:
         bricks_from_database_formatted.append(brick['brickID'])
         print brick['brickID']
-
-    for brick in image_list:
-        bricks_saved.append(brick.brick_id)
-        print brick.brick_id
 
     for i in range(0, len(bricks_saved)):
         print( 'database: %d, saved: %d' %
@@ -255,7 +261,7 @@ if __name__ == '__main__':
     # TODO remember to free memory
     # time when extracting all keypoints of the samples 14s real
 
-    save_keypoints()
+    #save_keypoints()
 
     # saves a camera picture as single.bmp
     #cmd = 'bin/SingleCaptureStorage'
