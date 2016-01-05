@@ -31,8 +31,7 @@ def extract_keypoints(img):
     detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
     kp, desc = detector.detectAndCompute(img, None)
     # draw keypoints for debug purpose
-    #print '%d keypoints extracted' % len(kp)
-    #imm=cv2.drawKeypoints(img1, kp1,img2);
+    #imm=cv2.drawKeypoints(img, kp, None);
     #cv2.imshow("Image", imm);
     #cv2.waitKey(0)
     return kp, desc
@@ -40,16 +39,14 @@ def extract_keypoints(img):
 # Image Matching
 def match_images(kp1, desc1, kp2, desc2):
     matcher = cv2.BFMatcher(cv2.NORM_L2)
-    print type(desc1)
     if desc2 is not None:
-        raw_matches = matcher.match(desc1, desc2)
+        raw_matches = matcher.knnMatch(desc1, trainDescriptors = desc2, k = 2)
     else:
-        print('************ Warning, no descriptors extracted! **************')
+        print('************ Warning, no descriptors found! **************')
         return None
-    #TODO remove this filter!!
-    #kp_pairs = filter_matches(kp1, kp2, raw_matches)
-    kp_pairs = zip(kp1, kp2)
-    return kp_pairs
+    kp_pairs = filter_matches(kp1, kp2, raw_matches)
+    print len(kp_pairs)
+    return kp_pairs, raw_matches
 
 # filter the matches by euclidean distance
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
@@ -115,18 +112,12 @@ def match_inliers(kp_pairs):
     p1 = numpy.float32([kp.pt for kp in mkp1])
     p2 = numpy.float32([kp.pt for kp in mkp2])
    
-    if len(kp_pairs) >= pairs_threshold:
-        H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
+    H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
     if status is not None:
         inliers = numpy.sum(status)
         matched = len(status)
         print( '%d / %d    inliers/matched quotient=%d' % (inliers, matched, matched/inliers))
-        #TODO tune here
-        if (matched/inliers < 25):
-            return status, H
-    else:
-        H, status = None, None
-        #print '%d matches found, not enough for homography estimation' % len(p1)
+    return status, H
     
 # check if the four points span a rectangle
 def is_rectangular(corners):
@@ -207,16 +198,15 @@ def save_keypoints():
     # os.walk returns a three tuple where 0 is the folder name
     for i in os.walk('images'):
         #TODO right now brick_id is wrong (images/21524)
-        print image_list[0].brick_id
         brick_id = i[0]
         for filename in filenames:
             filepath = brick_id + filename
             if os.path.isfile(filepath):
                 sample = cv2.imread(filepath, 0)
-                kp1, desc1 = extract_keypoints(sample)
-                print '%d keypoints extracted' % len(kp1)
+                kp, desc = extract_keypoints(sample)
+                print '%d keypoints extracted' % len(kp)
                 # Store the keypoints
-                temp_image = Image(kp1, desc1, filename, brick_id)
+                temp_image = Image(kp, desc, filename, brick_id)
                 image_list.append(temp_image)
     print len(image_list)
     pickle.dump(image_list, open('image_prop_database.pickle', 'wb'))
@@ -225,7 +215,6 @@ def save_keypoints():
 def unpickle_keypoints(image):
     keypoints = []
     descriptors = []
-    #for point in keypoints_array:
     for point in image.keypoints_array:
         temp_feature = cv2.KeyPoint(x=point[0][0],y=point[0][1],_size=point[1], _angle=point[2], _response=point[3], _octave=point[4], _class_id=point[5])
         keypoints.append(temp_feature)
@@ -240,7 +229,9 @@ if __name__ == '__main__':
     # TODO lego2 and lego3 aren't recognised
     # TODO check if every angle is rougly around 90 degree
     # TODO remember to free memory
+    # time when extracting all keypoints of the samples 14s real
 
+    #save_keypoints()
     cam_pic = cv2.imread('lego2.bmp', 0)
     image_list = []
     # TODO make sure it wrote before trying to load
@@ -250,13 +241,14 @@ if __name__ == '__main__':
 
     for image_obj in image_list:
         kp1, desc1 = unpickle_keypoints(image_obj)
-        kp_pairs = match_images(kp1, desc1, kp2, desc2)
-        # time when extracting all keypoints of the samples 14s real
+        kp_pairs, matches = match_images(kp1, desc1, kp2, desc2)
+
         if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
             status, H = match_inliers(kp_pairs)
             if status is not None:
                 sample = cv2.imread(image_obj.brick_id + image_obj.filename, 0)
                 vis = explore_match(sample, cam_pic, kp_pairs, status, H)
                 if vis is not None:
-                    cv2.imshow('wzl_vision', vis)
-                    cv2.waitKey()
+                    print '################ ITS A MATCH ####################'
+                    #cv2.imshow('wzl_vision', vis)
+                    #cv2.waitKey()
