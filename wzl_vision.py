@@ -45,7 +45,6 @@ def match_images(kp1, desc1, kp2, desc2):
         print('************ Warning, no descriptors found! **************')
         return None
     kp_pairs = filter_matches(kp1, kp2, raw_matches)
-    print len(kp_pairs)
     return kp_pairs, raw_matches
 
 # filter the matches by euclidean distance
@@ -184,6 +183,7 @@ def get_brick_db():
             os.makedirs(brick_folder)
         # TODO remove old folders
         images = brick['images']
+        #TODO all as else if and if no image is in there remove folder
         for image in images:
             if 'front' in image:
                 urllib.urlretrieve(pic_url_start + image['front'], brick_folder + '/front.png')
@@ -201,11 +201,11 @@ def save_keypoints():
     filenames = ['/back.png', '/front.png', '/left.png', '/right.png']
     # os.walk returns a three tuple where index 1 is a list of containing folder
     # names
-    for dirs in os.walk('images'):
+    for dirs in os.walk('../images'):
         #sort them, else they would be arbitrary ordered
         for brick_id in sorted(dirs[1], key=int):
             for filename in filenames:
-                filepath = 'images/' + brick_id + filename
+                filepath = '../images/' + brick_id + filename
                 if os.path.isfile(filepath):
                     sample = cv2.imread(filepath, 0)
                     kp, desc = extract_keypoints(sample)
@@ -236,6 +236,8 @@ def remove_duplicate_bricks(image_list):
         brick_id = brick.brick_id
         if brick_id not in checked:
             checked.append(brick_id)
+    # convert to int list
+    checked = map(int, checked)
     return checked
 
 # compare the brick id's from the server and in meomory
@@ -246,11 +248,10 @@ def compare_brick_ids(bricks_from_database, image_list):
     bricks_saved = remove_duplicate_bricks(image_list)
     for brick in bricks_from_database:
         bricks_from_database_formatted.append(brick['brickID'])
-        print brick['brickID']
 
     for i in range(0, len(bricks_saved)):
         print( 'database: %d, saved: %d' %
-            (bricks_from_database[i],bricks_saved[i]))
+            (bricks_from_database_formatted[i],bricks_saved[i]))
 
 # Main
 if __name__ == '__main__':
@@ -264,10 +265,10 @@ if __name__ == '__main__':
     #save_keypoints()
 
     # saves a camera picture as single.bmp
-    #cmd = 'bin/SingleCaptureStorage'
+    #cmd = '../bin/SingleCaptureStorage'
     #os.system(cmd)
-    #cam_pic = cv2.imread('bin/single.bmp',0)
-    cam_pic = cv2.imread('lego2.bmp', 0)
+    #cam_pic = cv2.imread('../bin/single.bmp',0)
+    cam_pic = cv2.imread('lego5.png', 0)
     image_list = []
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
@@ -285,7 +286,7 @@ if __name__ == '__main__':
         if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
             status, H = match_inliers(kp_pairs)
             if status is not None:
-                sample = cv2.imread(image_obj.brick_id + image_obj.filename, 0)
+                sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
                 vis = explore_match(sample, cam_pic, kp_pairs, status, H)
                 if vis is not None:
                     print '################ ITS A MATCH ####################'
