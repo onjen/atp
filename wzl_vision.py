@@ -17,11 +17,13 @@ import json
 import math
 import cPickle as pickle
 from image import *
+import shutil
 
 # Globals
 order_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?orderID='
 order_url_end = '&resourceType=json'
 pic_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?filename='
+db_name = 'image_prop_database.pickle'
 pairs_threshold = 5
 
 # extract the keypoints and the descriptors out of a sample image
@@ -169,31 +171,35 @@ def get_brick_db():
         # "images":[{"front":"brickID21914front.png"},{"back":"template303back.png"},
         # {"left":"template303left.png"},{"right":"template303right.png"}]}
         order = requests.get(order_url_start + str(i['orderID']) + order_url_end).json()
-        for brick in order:
-            bricks.append(brick)
-        orders.append(order)
+        # apparently there are other orders in the request so just take wzlCubes
+        if i['wzlCube'] == 1:
+            for brick in order:
+                bricks.append(brick)
+            orders.append(order)
     return bricks
-'''
+
+def save_pics(bricks):
     if not os.path.isdir('../images'):
         os.makedirs('../images')
 
     for brick in bricks:
         brick_folder = '../images/' + str(brick['brickID'])
+        sys.stdout.write("\rSaving brick pictures for brick_id %d locally..." % brick['brickID'])
+        sys.stdout.flush()
         if not os.path.isdir(brick_folder):
             os.makedirs(brick_folder)
         # TODO remove old folders
         images = brick['images']
-        #TODO all as else if and if no image is in there remove folder
         for image in images:
             if 'front' in image:
                 urllib.urlretrieve(pic_url_start + image['front'], brick_folder + '/front.png')
-            if 'back' in image:
+            elif 'back' in image:
                 urllib.urlretrieve(pic_url_start + image['back'], brick_folder + '/back.png')
-            if 'left' in image:
+            elif 'left' in image:
                 urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
-            if 'right' in image:
+            elif 'right' in image:
                 urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
-'''
+
 def save_keypoints():
     # TODO update with new order
     print 'Extracting keypoints out of the sample images...'
@@ -213,7 +219,6 @@ def save_keypoints():
                     temp_image = Image(kp, desc, filename, brick_id)
                     image_list.append(temp_image)
     print 'Keypoints for %d images extraced' % len(image_list)
-    db_name = 'image_prop_database.pickle'
     print 'Dump keypoints database to \'%s\'...' % db_name
     pickle.dump(image_list, open(db_name, 'wb'))
 
@@ -243,26 +248,27 @@ def remove_duplicate_bricks(image_list):
 # compare the brick id's from the server and in meomory
 # bricks_from_database is a JSON object containing brick data
 # image_list is the list of image_objects which is stored
-def compare_brick_ids(bricks_from_database, image_list):
+def compare_brick_ids(bricks_from_server, image_list):
     bricks_from_database_formatted = []
     bricks_saved = remove_duplicate_bricks(image_list)
-    for brick in bricks_from_database:
+    for brick in bricks_from_server:
         bricks_from_database_formatted.append(brick['brickID'])
+    # sort the brick_id's
+    bricks_from_database_formatted = sorted(bricks_from_database_formatted, key=int)
 
-    for i in range(0, len(bricks_saved)):
-        print( 'database: %d, saved: %d' %
+    for i in range(0, len(bricks_from_database_formatted)):
+        print( 'server: %d, saved: %d' %
             (bricks_from_database_formatted[i],bricks_saved[i]))
 
 # Main
 if __name__ == '__main__':
     # TODO when adding an order calculate keypoints and so on
     # TODO kp_pairs threshold dynamically, dependant on the features?
-    # TODO lego2 and lego3 aren't recognised
+    # TODO lego2 isn't recognised
     # TODO check if every angle is rougly around 90 degree
     # TODO remember to free memory
     # time when extracting all keypoints of the samples 14s real
 
-    #save_keypoints()
 
     # saves a camera picture as single.bmp
     #cmd = '../bin/SingleCaptureStorage'
@@ -272,9 +278,11 @@ if __name__ == '__main__':
     image_list = []
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
-    image_list = pickle.load(open('image_prop_database.pickle', 'rb'))
+    image_list = pickle.load(open(db_name, 'rb'))
     # get a list of JSON objects containing brick data
     bricks = get_brick_db()
+    #save_pics(bricks)
+    #save_keypoints()
     compare_brick_ids(bricks, image_list)
 
     kp2, desc2 = extract_keypoints(cam_pic)
@@ -289,6 +297,6 @@ if __name__ == '__main__':
                 sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
                 vis = explore_match(sample, cam_pic, kp_pairs, status, H)
                 if vis is not None:
-                    print '################ ITS A MATCH ####################'
+                    print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
                     #cv2.imshow('wzl_vision', vis)
                     #cv2.waitKey()
