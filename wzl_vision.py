@@ -28,9 +28,15 @@ pairs_threshold = 5
 
 # extract the keypoints and the descriptors out of a sample image
 def extract_keypoints(img):
-    # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
-    # extended, bool upright
-    detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
+    # check opencv version because the syntax changed
+    major, minor, _ = cv2.__version__.split(".")
+    print 'opencv version: major %s, minor %s' % (major,minor)
+    if major == '2':
+        # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
+        # extended, bool upright
+        detector = cv2.SURF(400, 4, 2, 0, 1)
+    else:
+        detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
     kp, desc = detector.detectAndCompute(img, None)
     # draw keypoints for debug purpose
     #imm=cv2.drawKeypoints(img, kp, None);
@@ -267,14 +273,17 @@ if __name__ == '__main__':
     # TODO lego2 isn't recognised
     # TODO check if every angle is rougly around 90 degree
     # TODO remember to free memory
+    # TODO check resolution and delete the side bricks
     # time when extracting all keypoints of the samples 14s real
 
 
     # saves a camera picture as single.bmp
-    #cmd = '../bin/SingleCaptureStorage'
-    #os.system(cmd)
-    #cam_pic = cv2.imread('../bin/single.bmp',0)
-    cam_pic = cv2.imread('lego5.png', 0)
+    if sys.platform.startswith('linux'):
+        cmd = '../bin/SingleCaptureStorage'
+    elif sys.platform.startswith('win32'):
+        cmd = 'SingleCaptureStorage.exe'
+    os.system(cmd)
+    cam_pic = cv2.imread('single.bmp',0)
     image_list = []
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
