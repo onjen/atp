@@ -138,29 +138,42 @@ def is_rectangular(corners):
     #print ('distance BC: %d' % dist_BC)
     # check if the diagonals are almost equal and if the distances are valid
     # TODO dependent on the resolution
+    angles = []
     if abs(dist_AD - dist_BC) < 50 and dist_AD > 80 and dist_BC > 80:
-        angle_A = angle(A-B, A-D)
-        angle_B = angle(B-A, B-C)
-        angle_C = angle(C-B, C-D)
-        angle_D = angle(D-C, D-A)
-        #print ('angles A: %f, B: %f, C: %f, D: %f' % (angle_A, angle_B, angle_C,
-        #    angle_D))
-        angle_sum = angle_A + angle_B + angle_C + angle_D
+        angles.append(calc_angle(A-B, A-D))
+        angles.append(calc_angle(B-A, B-C))
+        angles.append(calc_angle(C-B, C-D))
+        angles.append(calc_angle(D-C, D-A))
+        angle_sum = sum(angles)
         #print('angle_sum = %f' % angle_sum)
+        # first check if sum is in threshold
         if (angle_sum > 340 and angle_sum < 380):
-            return True
+            # check if every angle is around 90 degree
+            angle_max = 110
+            angle_min = 70
+            threshold_check = []
+            for angle in angles:
+                threshold_check.append(is_angle_in_threshold(angle, angle_min, angle_max))
+            if sum(threshold_check) == 4:
+                return True
     else:
         return False
 
 def dotproduct(v1, v2):
-  return sum((a*b) for a, b in zip(v1, v2))
+    return sum((a*b) for a, b in zip(v1, v2))
 
 def length(v):
-  return math.sqrt(dotproduct(v, v))
+    return math.sqrt(dotproduct(v, v))
 
 #Returns the angle in radians between vectors 'v1' and 'v2'
-def angle(v1, v2):
-  return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
+def calc_angle(v1, v2):
+    return math.degrees(math.acos(dotproduct(v1, v2) / (length(v1) * length(v2))))
+
+def is_angle_in_threshold(angle, angle_min, angle_max):
+    if (angle < angle_max and angle > angle_min):
+        return True
+    else:
+        return False
 
 # get a list of bricks from active orders in the database
 # @return a list of JSON objects containing brick data
@@ -284,15 +297,16 @@ if __name__ == '__main__':
         cmd = 'SingleCaptureStorage.exe'
     os.system(cmd)
     cam_pic = cv2.imread('single.bmp',0)
+    cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
     image_list = []
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
     image_list = pickle.load(open(db_name, 'rb'))
     # get a list of JSON objects containing brick data
-    bricks = get_brick_db()
+    #bricks = get_brick_db()
     #save_pics(bricks)
     #save_keypoints()
-    compare_brick_ids(bricks, image_list)
+    #compare_brick_ids(bricks, image_list)
 
     kp2, desc2 = extract_keypoints(cam_pic)
 
@@ -307,5 +321,5 @@ if __name__ == '__main__':
                 vis = explore_match(sample, cam_pic, kp_pairs, status, H)
                 if vis is not None:
                     print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
-                    #cv2.imshow('wzl_vision', vis)
-                    #cv2.waitKey()
+                    cv2.imshow('wzl_vision', vis)
+                    cv2.waitKey()
