@@ -30,7 +30,7 @@ pairs_threshold = 5
 def extract_keypoints(img):
     # check opencv version because the syntax changed
     major, minor, _ = cv2.__version__.split(".")
-    print 'opencv version: major %s, minor %s' % (major,minor)
+    #print 'opencv version: major %s, minor %s' % (major,minor)
     if major == '2':
         # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
         # extended, bool upright
@@ -289,37 +289,39 @@ if __name__ == '__main__':
     # TODO check resolution and delete the side bricks
     # time when extracting all keypoints of the samples 14s real
 
-
-    # saves a camera picture as single.bmp
-    if sys.platform.startswith('linux'):
-        cmd = '../bin/SingleCaptureStorage'
-    elif sys.platform.startswith('win32'):
-        cmd = 'SingleCaptureStorage.exe'
-    os.system(cmd)
-    cam_pic = cv2.imread('single.bmp',0)
-    cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
-    image_list = []
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
+    image_list = []
     image_list = pickle.load(open(db_name, 'rb'))
-    # get a list of JSON objects containing brick data
-    #bricks = get_brick_db()
-    #save_pics(bricks)
-    #save_keypoints()
-    #compare_brick_ids(bricks, image_list)
 
-    kp2, desc2 = extract_keypoints(cam_pic)
+    while True:
+        # saves a camera picture as single.bmp
+        if sys.platform.startswith('linux'):
+            cmd = '../bin/SingleCaptureStorage'
+        elif sys.platform.startswith('win32'):
+            cmd = 'SingleCaptureStorage.exe'
+        #os.system(cmd)
+        cam_pic = cv2.imread('single.bmp',0)
+        cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
+        # get a list of JSON objects containing brick data
+        #bricks = get_brick_db()
+        #save_pics(bricks)
+        #save_keypoints()
+        #compare_brick_ids(bricks, image_list)
 
-    for image_obj in image_list:
-        kp1, desc1 = unpickle_keypoints(image_obj)
-        kp_pairs, matches = match_images(kp1, desc1, kp2, desc2)
+        kp2, desc2 = extract_keypoints(cam_pic)
 
-        if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-            status, H = match_inliers(kp_pairs)
-            if status is not None:
-                sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
-                vis = explore_match(sample, cam_pic, kp_pairs, status, H)
-                if vis is not None:
-                    print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
-                    cv2.imshow('wzl_vision', vis)
-                    cv2.waitKey()
+        for image_obj in reversed(image_list):
+            kp1, desc1 = unpickle_keypoints(image_obj)
+            kp_pairs, matches = match_images(kp1, desc1, kp2, desc2)
+
+            if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+                status, H = match_inliers(kp_pairs)
+                if status is not None:
+                    sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
+                    vis = explore_match(sample, cam_pic, kp_pairs, status, H)
+                    if vis is not None:
+                        print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
+                        cv2.imshow('wzl_vision', vis)
+                        cv2.waitKey()
+                        break
