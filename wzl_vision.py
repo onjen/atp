@@ -123,7 +123,6 @@ def match_inliers(kp_pairs):
     if status is not None:
         inliers = numpy.sum(status)
         matched = len(status)
-        print( '%d / %d    inliers/matched quotient=%d' % (inliers, matched, matched/inliers))
     return status, H
     
 # check if the four points span a rectangle
@@ -288,6 +287,7 @@ if __name__ == '__main__':
     # TODO remember to free memory
     # TODO check resolution and delete the side bricks
     # time when extracting all keypoints of the samples 14s real
+    # TODO 2nd try + dieser mit der saeule wird nicht erkannt
 
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
@@ -311,6 +311,8 @@ if __name__ == '__main__':
 
         kp2, desc2 = extract_keypoints(cam_pic)
 
+        match = False
+        print 'Going through all images...'
         for image_obj in reversed(image_list):
             kp1, desc1 = unpickle_keypoints(image_obj)
             kp_pairs, matches = match_images(kp1, desc1, kp2, desc2)
@@ -321,7 +323,12 @@ if __name__ == '__main__':
                     sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
                     vis = explore_match(sample, cam_pic, kp_pairs, status, H)
                     if vis is not None:
+                        match = True
                         print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
                         cv2.imshow('wzl_vision', vis)
                         cv2.waitKey()
+                        cv2.destroyAllWindows()
                         break
+        if match == False:
+            print 'No Match found'
+            raw_input('Press Enter to Continue...')
