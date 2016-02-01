@@ -287,13 +287,14 @@ if __name__ == '__main__':
     # TODO remember to free memory
     # TODO check resolution and delete the side bricks
     # time when extracting all keypoints of the samples 14s real
-    # TODO 2nd try + dieser mit der saeule wird nicht erkannt
+    # TODO dieser mit der saeule wird nicht erkannt
 
     # TODO make sure it wrote before trying to load
     print 'Loading saved pickle database...'
     image_list = []
     image_list = pickle.load(open(db_name, 'rb'))
 
+    try_number = 1
     while True:
         # saves a camera picture as single.bmp
         if sys.platform.startswith('linux'):
@@ -301,7 +302,7 @@ if __name__ == '__main__':
         elif sys.platform.startswith('win32'):
             cmd = 'SingleCaptureStorage.exe'
         #os.system(cmd)
-        cam_pic = cv2.imread('single.bmp',0)
+        cam_pic = cv2.imread('nichterkannt.bmp',0)
         cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
         # get a list of JSON objects containing brick data
         #bricks = get_brick_db()
@@ -330,5 +331,9 @@ if __name__ == '__main__':
                         cv2.destroyAllWindows()
                         break
         if match == False:
-            print 'No Match found'
-            raw_input('Press Enter to Continue...')
+            print 'No Match found: Trying again'
+            if try_number == 2:
+                raw_input('Press Enter to Continue...')
+                try_number = 1
+            else:
+                try_number = try_number + 1
