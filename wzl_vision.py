@@ -4,7 +4,16 @@
 Documentation
 different filters (matches, quotient, geometrical and so on)
 performance (serialize and store the keypoints, save to database)
-TODO
+
+1. wait for an ID from the MES
+2. get the pictures for this ID from the ERP server
+3. extract Keypoints for those two images
+4. take a picture
+5. extract keypoints from the camera picture
+5. compare both of the images with the camera picture
+6. determine which orientation the brick will have
+7. send the orientation back to the MES
+8. goto step 1
 '''
 
 import numpy
