@@ -14,6 +14,8 @@ performance (serialize and store the keypoints, save to database)
 6. determine which orientation the brick will have
 7. send the orientation back to the MES
 8. goto step 1
+
+New Method to get the two images, filter the side images out by resolution
 '''
 
 import numpy
@@ -27,6 +29,8 @@ import math
 import cPickle as pickle
 from image import *
 import shutil
+from mysocket import *
+import matplotlib.pyplot as plt
 
 # Globals
 order_url_start = 'http://134.130.232.9:50000/AppParkServer/BrickServlet?orderID='
@@ -183,49 +187,60 @@ def is_angle_in_threshold(angle, angle_min, angle_max):
     else:
         return False
 
-# get a list of bricks from active orders in the database
-# @return a list of JSON objects containing brick data
-def get_brick_db():
-    print 'Retrieving bricks from the server...'
-    r = requests.get('http://134.130.232.9:50000/AppParkServer/OrderServlet?progress=99')
-    json_request = r.json()
-    orders = []
-    bricks = []
-    # get all bricks
-    for i in json_request:
-        # an order looks like this:
-        # {"brickID":21914,"color":15,"hasStuds":1,"offsetX":3,"offsetY":0,"offsetZ":3,"sizeX":4,"sizeZ":2,
-        # "images":[{"front":"brickID21914front.png"},{"back":"template303back.png"},
-        # {"left":"template303left.png"},{"right":"template303right.png"}]}
-        order = requests.get(order_url_start + str(i['orderID']) + order_url_end).json()
-        # apparently there are other orders in the request so just take wzlCubes
-        if i['wzlCube'] == 1:
-            for brick in order:
-                bricks.append(brick)
-            orders.append(order)
-    return bricks
+# saves the two images for a brick
+# takes the orderID and the position of the brick, which is a number from 1-6
+# from bottom to top
+def save_brick_pics(order_id, brick_id, position):
+    print 'Retrieving bricks pictures from the server...'
+    order = requests.get(order_url_start + str(order_id) + order_url_end).json()
+    for brick in order:
+        if brick['brickID'] == int(brick_id):
+            images = brick['images']
+            for image in images:
+                if not os.path.isdir('images'):
+                    os.makedirs('images')
+                image_folder = 'images'
+                if (position <=2) or (position >= 5): #bottom or top row
+                    print 'top or bottom row'
+                    if 'left' in image:
+                        urllib.urlretrieve(pic_url_start + image['left'],
+                                image_folder + '/left.png')
+                        print 'Saved left.png'
+                    if 'right' in image:
+                        urllib.urlretrieve(pic_url_start + image['right'],
+                                image_folder + '/right.png')
+                        print 'Saved right.png'
+                else:
+                    if 'front' in image:
+                        urllib.urlretrieve(pic_url_start + image['front'],
+                                image_folder + '/front.png')
+                        print 'Saved front.png'
+                    if 'back' in image:
+                        urllib.urlretrieve(pic_url_start + image['back'],
+                                image_folder + '/back.png')
+                        print 'Saved back.png'
 
-def save_pics(bricks):
-    if not os.path.isdir('../images'):
-        os.makedirs('../images')
+# compare an image from the server with the camera image
+def extract_and_compare(cam_pic, brick_pic):
+    brick_pic = cv2.imread(brick_pic,0)
+    kp, desc = extract_keypoints(brick_pic)
+    kp2, desc2 = extract_keypoints(cam_pic)
 
-    for brick in bricks:
-        brick_folder = '../images/' + str(brick['brickID'])
-        sys.stdout.write("\rSaving brick pictures for brick_id %d locally..." % brick['brickID'])
-        sys.stdout.flush()
-        if not os.path.isdir(brick_folder):
-            os.makedirs(brick_folder)
-        # TODO remove old folders
-        images = brick['images']
-        for image in images:
-            if 'front' in image:
-                urllib.urlretrieve(pic_url_start + image['front'], brick_folder + '/front.png')
-            elif 'back' in image:
-                urllib.urlretrieve(pic_url_start + image['back'], brick_folder + '/back.png')
-            elif 'left' in image:
-                urllib.urlretrieve(pic_url_start + image['left'], brick_folder + '/left.png')
-            elif 'right' in image:
-                urllib.urlretrieve(pic_url_start + image['right'], brick_folder + '/right.png') 
+    kp_pairs, matches = match_images(kp, desc, kp2, desc2)
+
+    if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
+        status, H = match_inliers(kp_pairs)
+        if status is not None:
+            vis = explore_match(brick_pic, cam_pic, kp_pairs, status, H)
+            if vis is not None:
+                match = True
+                print '################ ITS A MATCH (%s) ####################'
+                imgplot = plt.imshow(vis)
+                plt.show()
+                plt.show()
+                return True
+    else:
+        return False
 
 def save_keypoints():
     # TODO update with new order
@@ -249,100 +264,62 @@ def save_keypoints():
     print 'Dump keypoints database to \'%s\'...' % db_name
     pickle.dump(image_list, open(db_name, 'wb'))
 
-# reformat to de-serialize keypoints and descriptors
-def unpickle_keypoints(image):
-    keypoints = []
-    descriptors = []
-    for point in image.keypoints_array:
-        temp_feature = cv2.KeyPoint(x=point[0][0],y=point[0][1],_size=point[1], _angle=point[2], _response=point[3], _octave=point[4], _class_id=point[5])
-        keypoints.append(temp_feature)
-        temp_descriptor = point[6]
-        descriptors.append(temp_descriptor)
-    return keypoints, numpy.array(descriptors)
-
-# the pickled database contains all images, so we have multiple brick_id's
-# because on brick has several images (e.g. front.png, back.png...)
-def remove_duplicate_bricks(image_list):
-    checked = []
-    for brick in image_list:
-        brick_id = brick.brick_id
-        if brick_id not in checked:
-            checked.append(brick_id)
-    # convert to int list
-    checked = map(int, checked)
-    return checked
-
-# compare the brick id's from the server and in meomory
-# bricks_from_database is a JSON object containing brick data
-# image_list is the list of image_objects which is stored
-def compare_brick_ids(bricks_from_server, image_list):
-    bricks_from_database_formatted = []
-    bricks_saved = remove_duplicate_bricks(image_list)
-    for brick in bricks_from_server:
-        bricks_from_database_formatted.append(brick['brickID'])
-    # sort the brick_id's
-    bricks_from_database_formatted = sorted(bricks_from_database_formatted, key=int)
-
-    for i in range(0, len(bricks_from_database_formatted)):
-        print( 'server: %d, saved: %d' %
-            (bricks_from_database_formatted[i],bricks_saved[i]))
-
 # Main
 if __name__ == '__main__':
-    # TODO when adding an order calculate keypoints and so on
-    # TODO kp_pairs threshold dynamically, dependant on the features?
-    # TODO lego2 isn't recognised
-    # TODO check if every angle is rougly around 90 degree
-    # TODO remember to free memory
     # TODO check resolution and delete the side bricks
-    # time when extracting all keypoints of the samples 14s real
     # TODO dieser mit der saeule wird nicht erkannt
 
-    # TODO make sure it wrote before trying to load
-    print 'Loading saved pickle database...'
-    image_list = []
-    image_list = pickle.load(open(db_name, 'rb'))
+    sock = mysocket() #create a new socket instance
+    print 'Connecting to server...'
+    sock.connect()
+    print 'Connection successful' 
 
     try_number = 1
     while True:
+        print 'Waiting to receive an ID...'
+        reply = sock.receive()
+        if reply is "":
+            continue
+        print 'Received: ' + reply
+        #split the reply which is separated by semilkolons
+        splitted_reply = reply.split(';')
+        order_id = splitted_reply[0]
+        brick_id = splitted_reply[1]
+        position = splitted_reply[2]
+        # 1. orderID, brickID, position von unten nach oben 1-6,
+        save_brick_pics(order_id, brick_id, position)
+
         # saves a camera picture as single.bmp
         if sys.platform.startswith('linux'):
             cmd = '../bin/SingleCaptureStorage'
         elif sys.platform.startswith('win32'):
             cmd = 'SingleCaptureStorage.exe'
-        #os.system(cmd)
-        cam_pic = cv2.imread('nichterkannt.bmp',0)
+        os.system(cmd)
+        cam_pic = cv2.imread('single.bmp',0)
         cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
-        # get a list of JSON objects containing brick data
-        #bricks = get_brick_db()
-        #save_pics(bricks)
-        #save_keypoints()
-        #compare_brick_ids(bricks, image_list)
 
-        kp2, desc2 = extract_keypoints(cam_pic)
+        # It's the bottom or the the top row
+        if position <= 2 or position >= 5:
+            if extract_and_compare(cam_pic, 'images/left.png'):
+                print 'Its left'
+                sock.send('True')
+                continue
+            elif extract_and_compare(cam_pic, 'images/right.png'):
+                print 'Its right'
+                sock.send('False')
+                continue
+        # It's the middle row
+        else:
+            if extract_and_compare(cam_pic, 'images/front.png'):
+                print 'Its front'
+                sock.send('True')
+                continue
+            elif extract_and_compare(cam_pic, 'images/back.png'):
+                print 'Its back'
+                sock.send('False')
+                continue
+				
+		#All went wrong
+		sock.send('False')
 
-        match = False
-        print 'Going through all images...'
-        for image_obj in reversed(image_list):
-            kp1, desc1 = unpickle_keypoints(image_obj)
-            kp_pairs, matches = match_images(kp1, desc1, kp2, desc2)
-
-            if kp_pairs is not None and len(kp_pairs) >= pairs_threshold:
-                status, H = match_inliers(kp_pairs)
-                if status is not None:
-                    sample = cv2.imread('../images/' + image_obj.brick_id + image_obj.filename, 0)
-                    vis = explore_match(sample, cam_pic, kp_pairs, status, H)
-                    if vis is not None:
-                        match = True
-                        print '################ ITS A MATCH (%s) ####################' % (image_obj.brick_id + image_obj.filename )
-                        cv2.imshow('wzl_vision', vis)
-                        cv2.waitKey()
-                        cv2.destroyAllWindows()
-                        break
-        if match == False:
-            print 'No Match found: Trying again'
-            if try_number == 2:
-                raw_input('Press Enter to Continue...')
-                try_number = 1
-            else:
-                try_number = try_number + 1
+        #TODO DELETE THE IMAGES IN THE FOLDER

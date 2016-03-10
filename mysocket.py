@@ -7,8 +7,8 @@ class mysocket:
 
     def __init__(self):
         self.s = socket.socket()
-        #self.host = socket.gethostname()
-        self.host = '192.168.178.27'
+        self.host = socket.gethostname()
+        #self.host = '134.61.83.152'
         self.port = 11000
 
     def connect(self):
