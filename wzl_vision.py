@@ -308,8 +308,7 @@ if __name__ == '__main__':
                 print 'Its right'
                 sock.send('False')
                 continue
-        # It's the middle row
-        else:
+        else: # It's the middle row 
             if extract_and_compare(cam_pic, 'images/front.png'):
                 print 'Its front'
                 sock.send('True')
@@ -318,8 +317,5 @@ if __name__ == '__main__':
                 print 'Its back'
                 sock.send('False')
                 continue
-				
-		#All went wrong
-		sock.send('False')
-
-        #TODO DELETE THE IMAGES IN THE FOLDER
+        #All went wrong
+        sock.send('False')
