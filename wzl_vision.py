@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 '''
-Documentation
-different filters (matches, quotient, geometrical and so on)
-performance (serialize and store the keypoints, save to database)
+Skript to match two images based on the SURF Algorithm
+of OpenCV, integrated in the WZL Smart Factory
 
+The loop looks like this:
 1. wait for an ID from the MES
 2. get the pictures for this ID from the ERP server
 3. extract Keypoints for those two images
@@ -14,8 +14,6 @@ performance (serialize and store the keypoints, save to database)
 6. determine which orientation the brick will have
 7. send the orientation back to the MES
 8. goto step 1
-
-New Method to get the two images, filter the side images out by resolution
 '''
 
 import numpy
@@ -92,7 +90,6 @@ def explore_match(img1, img2, kp_pairs, status = None, H = None):
         corners = numpy.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]])
         corners = numpy.int32( cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2) + (w1, 0) )
         is_rect = is_rectangular(corners)
-        #TODO change the method calls
         if not is_rect:
             return None
         cv2.polylines(vis, [corners], True, (51, 255, 255))
@@ -149,7 +146,6 @@ def is_rectangular(corners):
     dist_BC = math.sqrt(math.pow(B[0] - C[0], 2) + math.pow(B[1] - C[1], 2))
     #print ('distance BC: %d' % dist_BC)
     # check if the diagonals are almost equal and if the distances are valid
-    # TODO dependent on the resolution
     angles = []
     if abs(dist_AD - dist_BC) < 50 and dist_AD > 80 and dist_BC > 80:
         angles.append(calc_angle(A-B, A-D))
@@ -243,7 +239,6 @@ def extract_and_compare(cam_pic, brick_pic):
         return False
 
 def save_keypoints():
-    # TODO update with new order
     print 'Extracting keypoints out of the sample images...'
     image_list = []
     filenames = ['/back.png', '/front.png', '/left.png', '/right.png']
@@ -266,9 +261,6 @@ def save_keypoints():
 
 # Main
 if __name__ == '__main__':
-    # TODO check resolution and delete the side bricks
-    # TODO dieser mit der saeule wird nicht erkannt
-
     sock = mysocket() #create a new socket instance
     print 'Connecting to server...'
     sock.connect()
