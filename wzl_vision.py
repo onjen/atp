@@ -45,7 +45,7 @@ def extract_keypoints(img):
     if major == '2':
         # double hessianThreshold, int nOctaves, int nOctaveLayers, bool
         # extended, bool upright
-        detector = cv2.SURF(400, 4, 2, 0, 1)
+        detector = cv2.SURF(400, 4, 2, 1, 1)
     else:
         detector = cv2.xfeatures2d.SURF_create(400, 4, 2, 0, 1)
     kp, desc = detector.detectAndCompute(img, None)
@@ -196,25 +196,28 @@ def save_brick_pics(order_id, brick_id, position):
                 if not os.path.isdir('images'):
                     os.makedirs('images')
                 image_folder = 'images'
-                if (position <=2) or (position >= 5): #bottom or top row
-                    print 'top or bottom row'
-                    if 'left' in image:
-                        urllib.urlretrieve(pic_url_start + image['left'],
-                                image_folder + '/left.png')
-                        print 'Saved left.png'
-                    if 'right' in image:
-                        urllib.urlretrieve(pic_url_start + image['right'],
-                                image_folder + '/right.png')
-                        print 'Saved right.png'
-                else:
+                if (position == 3 or position == 4):
                     if 'front' in image:
                         urllib.urlretrieve(pic_url_start + image['front'],
-                                image_folder + '/front.png')
+                        image_folder + '/front.png')
                         print 'Saved front.png'
                     if 'back' in image:
                         urllib.urlretrieve(pic_url_start + image['back'],
                                 image_folder + '/back.png')
                         print 'Saved back.png'
+                else:
+                    #bottom or top row
+                    print 'top or bottom row'
+                    if 'left' in image:
+                        urllib.urlretrieve(pic_url_start + image['left'],
+                        image_folder + '/left.png')
+                        print 'Saved left.png'
+                    if 'right' in image:
+                        urllib.urlretrieve(pic_url_start + image['right'],
+                        image_folder + '/right.png')
+                        print 'Saved right.png'
+                
+                    
 
 # compare an image from the server with the camera image
 def extract_and_compare(cam_pic, brick_pic):
@@ -232,11 +235,11 @@ def extract_and_compare(cam_pic, brick_pic):
                 match = True
                 print '################ ITS A MATCH (%s) ####################'
                 imgplot = plt.imshow(vis)
-                plt.show()
-                plt.show()
+                #plt.show()
+                #plt.show()
                 return True
-    else:
-        return False
+
+    return False
 
 def save_keypoints():
     print 'Extracting keypoints out of the sample images...'
@@ -277,7 +280,7 @@ if __name__ == '__main__':
         splitted_reply = reply.split(';')
         order_id = splitted_reply[0]
         brick_id = splitted_reply[1]
-        position = splitted_reply[2]
+        position = int(splitted_reply[2])
         # 1. orderID, brickID, position von unten nach oben 1-6,
         save_brick_pics(order_id, brick_id, position)
 
@@ -291,7 +294,7 @@ if __name__ == '__main__':
         cam_pic = cv2.resize(cam_pic, None, fx=0.3, fy=0.3, interpolation = cv2.INTER_CUBIC)
 
         # It's the bottom or the the top row
-        if position <= 2 or position >= 5:
+        if (position <= 2) or (position >= 5):
             if extract_and_compare(cam_pic, 'images/left.png'):
                 print 'Its left'
                 sock.send('True')
@@ -299,8 +302,9 @@ if __name__ == '__main__':
             elif extract_and_compare(cam_pic, 'images/right.png'):
                 print 'Its right'
                 sock.send('False')
-                continue
-        else: # It's the middle row 
+                continue       
+        else: 
+            # It's the middle row
             if extract_and_compare(cam_pic, 'images/front.png'):
                 print 'Its front'
                 sock.send('True')
