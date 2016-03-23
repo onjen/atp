@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''
-Skript to match two images based on the SURF Algorithm
+Script to match two images based on the SURF Algorithm
 of OpenCV, integrated in the WZL Smart Factory
 
 The loop looks like this:
